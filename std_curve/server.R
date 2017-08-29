@@ -5,23 +5,16 @@ library(tidyr)
 library(ggplot2)
 library(readxl)
 library(plotly)
+source("../utils/io.R")
+source("../utils/format.R")
 
-
-as.Num = function(x){
-  x %>% as.character %>% as.numeric
-}
 
 load_excel= function(input){
   # loading excel file of plate reader output
-  infile = input$data_file
-  if(is.null(infile)){
+  if(is.null(input$data_file)){
     return(NULL)
   }
-  file_ext = gsub('.+(\\.[^.])$', '\\1', infile$name) 
-  new_file = paste0(infile$datapath, file_ext)
-  file.rename(infile$datapath,
-              new_file)
-  df = read_excel(new_file, 
+  df = read_excel(rename_tmp_file(input$data_file), 
                   sheet=input$sheet_name)
   # formatting
   colnames(df) = gsub('[_/()% ]+', '_', colnames(df))
