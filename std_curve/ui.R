@@ -8,10 +8,22 @@ shinyUI(
     headerPanel("Plate reader"),
     
     sidebarPanel(      
-      fileInput("data_file", "Choose Excel File"),
-      textInput("sheet_name", 
-                label = "Sheet name", 
-                value = "Sheet1")
+      fileInput("data_file", "Choose Gen5 concentration table (Excel, csv, or txt)"),
+      textInput("sheet_name_data", 
+                label = "Sheet name (if excel)", 
+                value = "Sheet1"),
+      hr(),
+      h4('(optional) Add sample names to concentrations'),
+      fileInput("map_file", "A QIIME-formatted table of sample names (Excel, csv, or txt)"),
+      textInput("sheet_name_map",
+                label = "Sheet name (if excel)", 
+                value = "Sheet1"),
+      numericInput("sample_start", 
+                   label = "Starting sample (assuming sample order matches concentration table order)",
+                   value = '1', min=1),
+      numericInput("sample_end", 
+                   label = "Ending sample (assuming sample order matches concentration table order)",
+                   value = '40', min=1)
     ),
     mainPanel(
       tabsetPanel(type = "tabs", 
@@ -20,7 +32,9 @@ shinyUI(
                   tabPanel("Std curve plot", plotlyOutput('std_curve_plot')),
                   tabPanel("Samples", DT::dataTableOutput('conc_tbl')),
                   tabPanel("Table for 'dilute'", DT::dataTableOutput('conc_tbl_dil')),
-                  tabPanel("Example data table", DT::dataTableOutput('example_tbl'))
+                  tabPanel("Mapping table", DT::dataTableOutput('mapping_tbl')),
+                  tabPanel("Example data table", DT::dataTableOutput('example_data_tbl')),
+                  tabPanel("Example mapping table", DT::dataTableOutput('example_map_tbl'))
       )
     )
   ))

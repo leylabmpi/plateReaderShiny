@@ -9,13 +9,33 @@ source("../utils/io.R")
 source("../utils/format.R")
 
 
-load_excel= function(input){
-  # loading excel file of plate reader output
-  if(is.null(input$data_file)){
+#' Reading table 
+read_table_file = function(infile, sheet_name){
+  if(endsWith(infile, '.xlsx') | endsWith(infile, '.xls')){
+    df = read_excel(infile, sheet=sheet_name)
+  } else
+  if(endsWith(infile, '.csv')){
+    df = read.table(infile, sep=',', header=TRUE, 
+                      comment.char='~', check.names=FALSE)
+  } else
+  if(endsWith(infile, '.txt')){
+    df = read.table(infile, sep='\t', header=TRUE, 
+                    comment.char='~', check.names=FALSE)
+  } else {
+    stop('Unknown input file format')
+  }
+  return(df)
+}
+
+#' Loading concentration table (plate reader output)
+read_conc = function(data_file, sheet_name){
+  # read table
+  if(is.null(data_file)){
     return(NULL)
   }
-  df = read_excel(rename_tmp_file(input$data_file), 
-                  sheet=input$sheet_name)
+  infile = rename_tmp_file(data_file)
+  df = read_table_file(infile, sheet_name)
+
   # formatting
   colnames(df) = gsub('[_/()% ]+', '_', colnames(df))
   colnames(df) = gsub('_+$', '', colnames(df))
@@ -29,6 +49,18 @@ load_excel= function(input){
            CV = CV %>% as.Num)
   return(df)
 }
+
+#' Loading mapping file
+read_map = function(map_file, sheet_name){
+  # read table
+  if(is.null(map_file)){
+    return(NULL)
+  }
+  infile = rename_tmp_file(map_file)
+  df = read_table_file(infile, sheet_name)
+  return(df)
+}
+
 
 # formatting linear regression equation for plotting
 equation = function(x) {
@@ -83,43 +115,76 @@ conc_tbl_to_dilute = function(df, sample_labware='96 Well[001]', plate_reader_la
   return(df)
 }
 
-#' loading example file
-load_ex_file = function(){
-  df = read.table('../data/picogreen1.csv', sep=',', header=TRUE, check.names=FALSE)
-  return(df)
+#' loading example plate reader file
+load_ex_data_file = function(){
+  read_excel('../data/picogreen1.xlsx')
 }
+
+#' loading example mapping file
+load_ex_map_file = function(){
+  read_excel('../data/mapping1.xlsx')
+}
+
+
 
 
 #-- server --#
 shinyServer(function(input, output, session) {
-
-  # Load excel
-  reac = reactive({
-    # reading in excel
-    ret = list()
-    ret[['table']] = load_excel(input)
-    if(is.null(ret$table)){
+  
+  # reading in data table
+  data_tbl = eventReactive(input$data_file, {
+    read_conc(input$data_file, input$sheet_name_data)
+  })
+  
+  # loading mapping file
+  map_tbl = eventReactive(input$map_file, {
+    read_map(input$map_file, input$sheet_name_map)
+  })
+  
+  # # adding sample names
+  # data_tbl_map = reactive({
+  #   if(is.null(map_tbl)){
+  #     return(data_tbl())
+  #   }
+  #   #add_sample_names(data_tbl(), map_tbl(), 
+  #   #                 sample_start = input$sample_start,
+  #   #                 sample_end = input$sample_end)
+  #   data_tbl()
+  # })
+  
+  # get standard curve
+  std_curve = reactive({
+    if(is.null(data_tbl())){
       return(NULL)
     }
-    # getting standard curve
-    ret[['std_curve']] = ret$table %>%
-      filter(Name == 'Standard curve',
-             !is.na(Count))
-    # linear regression
-    #ret$std_curve %>% filter(!is.na(Mean)) %>% print
-    ret[['std_curve_lm']] = lm(Mean ~ Conc_Dil, 
-                               data=ret$std_curve %>% filter(!is.na(Mean)))
-    # calculating concentrations
-    ret[['conc']] = calc_conc(ret$table, ret$std_curve_lm) %>%
-      mutate(Conc_Dil = round(Conc_Dil %>% as.Num, 3))
-    
-    # return 
-    return(ret)
+    df = data_tbl() %>%
+         filter(Name == 'Standard curve',
+                !is.na(Count),
+                !is.na(Mean)) 
   })
+  
+  # linear regression on standard curve
+  std_curve_lm = reactive({
+    if(is.null(std_curve())){
+      return(NULL)
+    }
+    lm(Mean ~ Conc_Dil, data = std_curve())
+  })
+  
+  # calculating concentrations
+  data_tbl_conc = reactive({
+    if(is.null(data_tbl()) | is.null(std_curve_lm())){
+      return(NULL)
+    }
+    calc_conc(data_tbl(), std_curve_lm()) %>%
+      mutate(Conc_Dil = round(Conc_Dil %>% as.Num, 3))
+  })
+  
+  #--- rendering ---#
   
   # Table of raw data
   output$raw_tbl = DT::renderDataTable(
-    reac()$table,
+    data_tbl(),
     filter = 'bottom',
     extensions = c('Buttons'),
     options = list(
@@ -131,7 +196,7 @@ shinyServer(function(input, output, session) {
   
   # Table of standard curve values
   output$std_curve_tbl = DT::renderDataTable(
-    reac()$std_curve,
+    std_curve(),
     filter = 'bottom',
     extensions = c('Buttons'),
     options = list(
@@ -144,11 +209,12 @@ shinyServer(function(input, output, session) {
   # standard curve plot
   output$std_curve_plot = renderPlotly({
     # std curve data
-    df_std_curve = reac()$std_curve
-    if(is.null(df_std_curve)){
+    if(is.null(std_curve())){
       return(NULL)
     }
-    df_std_curve = df_std_curve %>%
+    
+    # filtering out 'masked' values
+    df_std_curve = std_curve() %>%
       filter(!grepl('^[*].+[*]$', RFU),
              !is.na(RFU)) %>%
       rename('Mean_RFU' = Mean,
@@ -157,7 +223,7 @@ shinyServer(function(input, output, session) {
     # linear regression data
     x_txt = quantile(df_std_curve$Def_conc, 0.6, na.rm=TRUE) 
     y_txt = quantile(df_std_curve$Mean_RFU, 0.9, na.rm=TRUE) 
-    fit = reac()$std_curve_lm
+    fit = std_curve_lm()
     
     # plotting
     p = ggplot(df_std_curve, aes(Def_conc, Mean_RFU)) +
@@ -175,7 +241,7 @@ shinyServer(function(input, output, session) {
   
   # Table of calculated concentrations
   output$conc_tbl = DT::renderDataTable(
-    reac()$conc,
+    data_tbl_conc(),
     filter = 'bottom',
     extensions = c('Buttons'),
     options = list(
@@ -187,7 +253,7 @@ shinyServer(function(input, output, session) {
   
   # Table formatted for colutions
   output$conc_tbl_dil = DT::renderDataTable(
-    conc_tbl_to_dilute(reac()$conc),
+    conc_tbl_to_dilute(data_tbl_conc()),
     filter = 'bottom',
     extensions = c('Buttons'),
     options = list(
@@ -197,13 +263,35 @@ shinyServer(function(input, output, session) {
     )
   )
   
-  
-  # example data table
-  output$example_tbl = DT::renderDataTable(
-    load_ex_file(),
+  # Mapping file table
+  output$mapping_tbl = DT::renderDataTable(
+    map_tbl(),
+    filter = 'bottom',
     extensions = c('Buttons'),
     options = list(
-      pageLength = 200,
+      pageLength = 40,
+      dom = 'Blfrtip',
+      buttons = c('colvis', 'copy', 'csv', 'excel', 'pdf', 'print')
+    )
+  )
+  
+  # example data table
+  output$example_data_tbl = DT::renderDataTable(
+    load_ex_data_file(),
+    extensions = c('Buttons'),
+    options = list(
+      pageLength = 50,
+      dom = 'Brt',
+      buttons = c('copy', 'csv', 'excel', 'pdf', 'print')
+    )
+  )
+  
+  # example mapping table
+  output$example_map_tbl = DT::renderDataTable(
+    load_ex_map_file(),
+    extensions = c('Buttons'),
+    options = list(
+      pageLength = 50,
       dom = 'Brt',
       buttons = c('copy', 'csv', 'excel', 'pdf', 'print')
     )
