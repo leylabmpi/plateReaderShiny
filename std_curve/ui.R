@@ -19,11 +19,12 @@ shinyUI(
                 label = "Sheet name (if excel)", 
                 value = "Sheet1"),
       numericInput("sample_start", 
-                   label = "Starting sample (assuming sample order matches concentration table order)",
+                   label = "Starting sample in mapping file",
                    value = '1', min=1),
       numericInput("sample_end", 
-                   label = "Ending sample (assuming sample order matches concentration table order)",
-                   value = '40', min=1)
+                   label = "Ending sample in mapping file",
+                   value = '40', min=1),
+      h6('Note: assuming sample order matches concentration table order')
     ),
     mainPanel(
       tabsetPanel(type = "tabs", 

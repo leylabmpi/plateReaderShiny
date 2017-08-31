@@ -125,7 +125,25 @@ load_ex_map_file = function(){
   read_excel('../data/mapping1.xlsx')
 }
 
-
+#' Adding sample names to plate reader output ()
+#' Joining based on sample order
+add_sample_names = function(df_data, df_map, sample_start = 1, 
+                            sample_end = 1, plate_type='96 well'){
+  # limiting sample range
+  if(sample_start > nrow(df_map)){
+    return(df_data)
+  }
+  if(sample_end > nrow(df_map)){
+    sample_end = nrow(df_map)
+  }
+  
+  df_data = df_data[1:(sample_end-sample_start+1),]
+  x = df_map[sample_start:sample_end, c('#SampleID')] %>% 
+    as.matrix %>% as.vector
+  df_data$Name = x[1:nrow(df_data)]
+  
+  return(df_data)
+}
 
 
 #-- server --#
@@ -137,20 +155,12 @@ shinyServer(function(input, output, session) {
   })
   
   # loading mapping file
-  map_tbl = eventReactive(input$map_file, {
+  map_tbl = eventReactive(c(input$map_file, input$data_file), {
+    if(is.null(input$map_file)){
+      return(NULL)
+    }
     read_map(input$map_file, input$sheet_name_map)
   })
-  
-  # # adding sample names
-  # data_tbl_map = reactive({
-  #   if(is.null(map_tbl)){
-  #     return(data_tbl())
-  #   }
-  #   #add_sample_names(data_tbl(), map_tbl(), 
-  #   #                 sample_start = input$sample_start,
-  #   #                 sample_end = input$sample_end)
-  #   data_tbl()
-  # })
   
   # get standard curve
   std_curve = reactive({
@@ -176,9 +186,17 @@ shinyServer(function(input, output, session) {
     if(is.null(data_tbl()) | is.null(std_curve_lm())){
       return(NULL)
     }
-    calc_conc(data_tbl(), std_curve_lm()) %>%
+    df = calc_conc(data_tbl(), std_curve_lm()) %>%
       mutate(Conc_Dil = round(Conc_Dil %>% as.Num, 3))
+    # adding sample names
+    if(!is.null(map_tbl())){
+      df = df = add_sample_names(df, map_tbl(),
+                               sample_start = input$sample_start,
+                               sample_end = input$sample_end)
+    }
+    return(df)
   })
+   
   
   #--- rendering ---#
   
