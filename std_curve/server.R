@@ -229,8 +229,8 @@ shinyServer(function(input, output, session) {
     # adding sample names
     if(!is.null(map_tbl())){
       df = df = add_sample_names(df, map_tbl(),
-                               sample_start = input$sample_start,
-                               sample_end = input$sample_end)
+                                 sample_start = input$sample_start,
+                                 sample_end = input$sample_end)
     }
     return(df)
   })
@@ -292,7 +292,8 @@ shinyServer(function(input, output, session) {
   
   # Table of calculated concentrations
   output$conc_tbl = DT::renderDataTable(
-    data_tbl_conc(),
+    data_tbl_conc() %>%
+      dplyr::select(-Mean, -Std_Dev, -CV),
     filter = 'bottom',
     extensions = c('Buttons'),
     options = list(
@@ -309,7 +310,6 @@ shinyServer(function(input, output, session) {
                        input$TECAN_labware_type,
                        input$TECAN_target_position_start,
                        input$TECAN_target_position_end),
-                       #plate_reader_num_wells=input$plate_reader_num_wells),
     filter = 'bottom',
     extensions = c('Buttons'),
     options = list(
