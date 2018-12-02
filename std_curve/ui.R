@@ -23,7 +23,8 @@ shinyUI(
                        value = '1', min=1),
           numericInput("sample_end", 
                        label = "Ending sample in mapping file",
-                       value = '40', min=1)
+                       value = '40', min=1),
+          width=3
         ),
         mainPanel(
           tabsetPanel(
