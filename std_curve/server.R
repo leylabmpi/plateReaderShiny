@@ -123,15 +123,22 @@ well2loc = function(x, plate_type='96-well'){
 }
 
 #' formatting concentration table for dilution
-conc_tbl_to_dilute = function(df, sample_labware='96 Well[001]', plate_reader_labware='96-well'){
+conc_tbl_to_dilute = function(df,
+                              TECAN_labware_name,
+                              TECAN_labware_type,
+                              TECAN_target_position_start=1,
+                              TECAN_target_position_end=384){
   if(is.null(df)){
     return(NULL)
   }
+  TECAN_target_position = TECAN_target_position_start:TECAN_target_position_end
+  TECAN_target_position = TECAN_target_position[1:nrow(df)]
   df = df %>%
     dplyr::select(Well_ID, Name, Well, Conc_Dil) %>%
-    mutate(Sample_labware = sample_labware,
-           Sample_location = sapply(Well, well2loc, plate_type=plate_reader_labware),
-           Sample_concentration = Conc_Dil) %>%
+    mutate(TECAN_labware_name = TECAN_labware_name,
+           TECAN_labware_type = TECAN_labware_type,
+           TECAN_target_position = TECAN_target_position,
+           TECAN_sample_conc = Conc_Dil) %>%
     dplyr::select(-Conc_Dil, -Well)
   colnames(df) = gsub('_', ' ', colnames(df))
   return(df)
@@ -295,9 +302,14 @@ shinyServer(function(input, output, session) {
     )
   )
   
-  # Table formatted for colutions
+  # Table formatted for dilution app
   output$conc_tbl_dil = DT::renderDataTable(
-    conc_tbl_to_dilute(data_tbl_conc()),
+    conc_tbl_to_dilute(data_tbl_conc(), 
+                       input$TECAN_labware_name,
+                       input$TECAN_labware_type,
+                       input$TECAN_target_position_start,
+                       input$TECAN_target_position_end),
+                       #plate_reader_num_wells=input$plate_reader_num_wells),
     filter = 'bottom',
     extensions = c('Buttons'),
     options = list(
@@ -324,8 +336,9 @@ shinyServer(function(input, output, session) {
     load_ex_data_file(),
     extensions = c('Buttons'),
     options = list(
-      pageLength = 50,
-      dom = 'Brt',
+      pageLength = 96,
+      lengthMenu = c(96, 384, 1536),
+      dom = 'Blfrtip',
       buttons = c('copy', 'csv', 'excel', 'pdf', 'print')
     )
   )
@@ -335,8 +348,9 @@ shinyServer(function(input, output, session) {
     load_ex_map_file(),
     extensions = c('Buttons'),
     options = list(
-      pageLength = 50,
-      dom = 'Brt',
+      pageLength = 96,
+      lengthMenu = c(96, 384, 1536),
+      dom = 'Blfrtip',
       buttons = c('copy', 'csv', 'excel', 'pdf', 'print')
     )
   )
