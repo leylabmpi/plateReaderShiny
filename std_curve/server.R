@@ -27,6 +27,22 @@ read_table_file = function(infile, sheet_name){
   return(df)
 }
 
+#' fill in names
+fill_names = function(Name){
+  Name = Name %>% as.character
+  last_name = NULL
+  for(i in 1:length(Name)){
+    x = Name[i]
+    if(is.na(x) & !is.null(last_name)){
+      Name[i] = last_name
+    }
+    if(!is.na(x)){
+      last_name = x
+    }
+  }
+  return(Name)
+}
+
 #' Loading concentration table (plate reader output)
 read_conc = function(data_file, sheet_name){
   # read table
@@ -40,13 +56,20 @@ read_conc = function(data_file, sheet_name){
   colnames(df) = gsub('[_/()% ]+', '_', colnames(df))
   colnames(df) = gsub('_+$', '', colnames(df))
   colnames(df)[5] = 'RFU'
+  ## checking for required columns
+  req_cols = c('Well_ID', 'Name', 'Well', 'RFU')
+  for(x in req_cols){
+    stopifnot(x %in% colnames(df))
+  }
+  ## formatting columns
   df = df %>%
     mutate(Mean = ifelse(grepl('^[?]+$', Mean), NA, Mean),
            Std_Dev = ifelse(grepl('^[?]+$', Std_Dev), NA, Std_Dev),
            Mean = Mean %>% as.Num,
            Std_Dev = Std_Dev %>% as.Num,
            RFU = RFU %>% as.Num,
-           CV = CV %>% as.Num)
+           CV = CV %>% as.Num,
+           Name = fill_names(Name))
   return(df)
 }
 
@@ -61,8 +84,7 @@ read_map = function(map_file, sheet_name){
   return(df)
 }
 
-
-# formatting linear regression equation for plotting
+#' formatting linear regression equation for plotting
 equation = function(x) {
   a = round(coef(x)[1], digits = 2)
   b = round(coef(x)[2], digits = 2)
@@ -70,7 +92,7 @@ equation = function(x) {
   sprintf("y = %0.2fx +  %.2f, R^2 = %.2f", b, a, r2)
 }
 
-# calculating concentations based on linear regression of std curve
+#' calculating concentations based on linear regression of std curve
 calc_conc = function(df, fit){
   a = coef(fit)[1]
   b = coef(fit)[2]
@@ -162,15 +184,20 @@ shinyServer(function(input, output, session) {
     read_map(input$map_file, input$sheet_name_map)
   })
   
-  # get standard curve
+  # get standard curve values
+  masked_wells = reactive({
+    gsub(' +', '', input$masked_wells) %>%
+      strsplit(',') %>%
+      unlist
+  })
+  
   std_curve = reactive({
     if(is.null(data_tbl())){
       return(NULL)
     }
-    df = data_tbl() %>%
-         filter(Name == 'Standard curve',
-                !is.na(Count),
-                !is.na(Mean)) 
+    data_tbl() %>%
+        filter(Name == 'Standard curve') %>%
+        filter(!Well %in% masked_wells())
   })
   
   # linear regression on standard curve
@@ -178,7 +205,11 @@ shinyServer(function(input, output, session) {
     if(is.null(std_curve())){
       return(NULL)
     }
-    lm(Mean ~ Conc_Dil, data = std_curve())
+    df = std_curve() %>%
+      group_by(Conc_Dil) %>%
+      summarize(mean_RFU = mean(RFU, na.rm=TRUE)) %>%
+      ungroup()
+    lm(mean_RFU ~ Conc_Dil, data = df)
   })
   
   # calculating concentrations
@@ -197,9 +228,7 @@ shinyServer(function(input, output, session) {
     return(df)
   })
    
-  
   #--- rendering ---#
-  
   # Table of raw data
   output$raw_tbl = DT::renderDataTable(
     data_tbl(),
@@ -235,20 +264,17 @@ shinyServer(function(input, output, session) {
     df_std_curve = std_curve() %>%
       filter(!grepl('^[*].+[*]$', RFU),
              !is.na(RFU)) %>%
-      rename('Mean_RFU' = Mean,
-             'Def_conc' = Conc_Dil)
+      rename('Def_conc' = Conc_Dil)
     
     # linear regression data
     x_txt = quantile(df_std_curve$Def_conc, 0.6, na.rm=TRUE) 
-    y_txt = quantile(df_std_curve$Mean_RFU, 0.9, na.rm=TRUE) 
+    y_txt = quantile(df_std_curve$RFU, 0.9, na.rm=TRUE) 
     fit = std_curve_lm()
     
     # plotting
-    p = ggplot(df_std_curve, aes(Def_conc, Mean_RFU)) +
-      geom_linerange(aes(ymin=Mean_RFU-Std_Dev,
-                         ymax=Mean_RFU+Std_Dev)) +
-      geom_smooth(method=lm, se=FALSE) +
-      geom_point() +
+    p = ggplot(df_std_curve, aes(Def_conc, RFU)) +
+      geom_smooth(method=lm) +
+      geom_point(aes(test=Well)) +
       annotate("text", x=x_txt, y=y_txt, 
                label=equation(fit), 
                parse=TRUE, size=3) +
