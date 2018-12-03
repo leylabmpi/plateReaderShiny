@@ -36,29 +36,13 @@ read_table_pasted = function(x, header=TRUE){
   read.delim(text=x, sep='\t', header=header)
 }
 
-#' fill in names
-fill_names = function(Name){
-  Name = Name %>% as.character
-  last_name = NULL
-  for(i in 1:length(Name)){
-    x = Name[i]
-    if(is.na(x) & !is.null(last_name)){
-      Name[i] = last_name
-    }
-    if(!is.na(x)){
-      last_name = x
-    }
-  }
-  return(Name)
-}
 
 #' Loading concentration table (plate reader output)
 read_conc = function(txt, label, header=TRUE){
-  # read table
+  # read table from pasted-in
   if(is.null(txt) | nchar(txt) == 0){
     return(NULL)
   }
-  #infile = rename_tmp_file(data_file)
   df = read_table_pasted(txt, header=header)
 
   # formatting
@@ -81,9 +65,10 @@ read_conc = function(txt, label, header=TRUE){
            Std_Dev = Std_Dev %>% as.Num,
            RFU = RFU %>% as.Num,
            CV = CV %>% as.Num,
-           Name = fill_names(Name),
+           Name = Name %>% as.character,
+           Name = ifelse(lag(Name) != "", 
+                         lag(Name), Name), #fill_names(Name),
            Plate_ID = label)
-  
   return(df)
 }
 
@@ -107,8 +92,11 @@ equation = function(x) {
 }
 
 #' calculating concentations based on linear regression of std curve
-calc_conc = function(df, fit){
+calc_conc = function(df, fit, int_zero=FALSE){
   a = coef(fit)[1]
+  if(int_zero == TRUE){
+    a = 0
+  }
   b = coef(fit)[2]
   df %>%
     filter(grepl('^SPL[0-9]+', Well_ID)) %>%
@@ -273,19 +261,19 @@ shinyServer(function(input, output, session) {
       filter(Plate_ID == 'Plate1') %>%
       calc_conc(std_curve() %>% 
                   filter(Plate_ID == 'Plate1') %>%
-                  std_curve_lm) %>%
+                  std_curve_lm, input$set_intercept_zero) %>%
       mutate(Conc_Dil = round(Conc_Dil %>% as.Num, 3))
     df2 = data_tbl() %>% 
       filter(Plate_ID == 'Plate2') %>%
       calc_conc(std_curve() %>% 
                   filter(Plate_ID == 'Plate2') %>%
-                  std_curve_lm) %>%
+                  std_curve_lm, input$set_intercept_zero) %>%
       mutate(Conc_Dil = round(Conc_Dil %>% as.Num, 3))
     df3 = data_tbl() %>% 
       filter(Plate_ID == 'Plate3') %>%
       calc_conc(std_curve() %>% 
                   filter(Plate_ID == 'Plate3') %>%
-                  std_curve_lm) %>%
+                  std_curve_lm, input$set_intercept_zero) %>%
       mutate(Conc_Dil = round(Conc_Dil %>% as.Num, 3))
     # combining tables
     df1 = rbind(df1, df2)
@@ -350,15 +338,21 @@ shinyServer(function(input, output, session) {
     fit_plate3 = std_curve() %>% 
       filter(Plate_ID == 'Plate3') %>%
       std_curve_lm
-    df_txt = data.frame()
+    ## data.frame of lm equations
+    df_fit = data.frame(
+      Plate_ID = c('Plate1', 'Plate2', 'Plate3'),
+      Fit = c(lm2str(fit_plate1, input$set_intercept_zero),
+              lm2str(fit_plate2, input$set_intercept_zero),
+              lm2str(fit_plate3, input$set_intercept_zero)),
+      x = x_txt,
+      y = y_txt
+    )
     
     # plotting
     p = ggplot(df_std_curve, aes(Def_conc, RFU)) +
       geom_smooth(method=lm) +
       geom_point(aes(test=Well)) +
-      annotate("text", x=x_txt, y=y_txt, 
-               label=equation(fit_plate1), 
-               parse=TRUE, size=3) +
+      geom_text(data=df_fit, aes(x=x, y=y, label=Fit)) +
       labs(x='Defined conc.', y='RFU') +
       facet_wrap(~ Plate_ID, ncol=2) +
       theme_bw() 

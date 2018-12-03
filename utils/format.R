@@ -58,3 +58,18 @@ well384_index = function(){
   names(idx) = wells
   return(idx)
 }
+
+#' convert simple lm object (slope + intercept) to a string
+lm2str = function(lm_obj, int_zero=FALSE, rnd=1){
+  if(is.null(lm_obj)){
+    return("")
+  }
+  if(int_zero == TRUE){
+    b = 0
+  } else{
+    b = round(lm_obj$coefficients[1], rnd)
+  }
+  a = round(lm_obj$coefficients[2], rnd)
+  r2 = round(summary(lm_obj)$r.squared, rnd + 1)
+  sprintf('y ~ %sx + %s;  R^2 = %s', a, b, r2)
+}

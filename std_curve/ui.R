@@ -6,17 +6,6 @@ library(plotly)
 shinyUI(
   navbarPage("PicoGreen",
     tabPanel("Raw data",
-      sidebarLayout(
-        sidebarPanel(
-                 numericInput("sample_start", 
-                              label = "Starting sample in mapping file",
-                              value = '1', min=1),
-                 numericInput("sample_end", 
-                              label = "Ending sample in mapping file",
-                              value = '40', min=1),
-                 width=3
-               ),
-        mainPanel(
           tabsetPanel(
             tabPanel("Destination plate 1",
               textAreaInput("dest_plate_1", 
@@ -41,18 +30,19 @@ shinyUI(
             ),
             tabPanel("Sample IDs",
               textAreaInput("sample_ids", 
-                            "Paste sample names into this box", 
+                            "Paste sample names into this box (one per line)", 
                             "", 
                             width = "700px",
                             height = "500px")
             )
           )
-        )
-      )
     ),
     tabPanel("Std curve", 
       sidebarLayout(
         sidebarPanel(
+           checkboxInput("set_intercept_zero",
+                         label = "Set intercept to zero?", 
+                          value = FALSE),
            textInput("masked_wells_plate1",
                      label = "Plate1: Wells in the std curve to mask", 
                      value = ""),
@@ -66,7 +56,7 @@ shinyUI(
         ),
         mainPanel(
           tabsetPanel(
-            tabPanel("Std curve plot", plotlyOutput('std_curve_plot', height='600px')),
+            tabPanel("Std curve plot", plotlyOutput('std_curve_plot', height='700px')),
             tabPanel("Std curve table", DT::dataTableOutput('std_curve_tbl'))
           )
         )
