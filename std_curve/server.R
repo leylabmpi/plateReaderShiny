@@ -83,14 +83,6 @@ read_map = function(map_file, sheet_name){
   return(df)
 }
 
-#' formatting linear regression equation for plotting
-equation = function(x) {
-  a = round(coef(x)[1], digits = 2)
-  b = round(coef(x)[2], digits = 2)
-  r2 = round(summary(x)$r.squared, digits = 2)
-  sprintf("y = %0.2fx +  %.2f, R^2 = %.2f", b, a, r2)
-}
-
 #' calculating concentations based on linear regression of std curve
 calc_conc = function(df, fit, int_zero=FALSE){
   a = coef(fit)[1]
@@ -158,22 +150,13 @@ load_ex_map_file = function(){
 
 #' Adding sample names to plate reader output ()
 #' Joining based on sample order
-add_sample_names = function(df_data, df_map, sample_start = 1, 
-                            sample_end = 1, plate_type='96 well'){
+add_sample_names = function(df_data, df_map){
   # limiting sample range
-  if(sample_start > nrow(df_map)){
+  if(is.null(df_map) | nrow(df_map) == 0){
     return(df_data)
   }
-  if(sample_end > nrow(df_map)){
-    sample_end = nrow(df_map)
-  }
-  
-  df_data = df_data[1:(sample_end-sample_start+1),]
-  x = df_map[sample_start:sample_end, c('#SampleID')] %>% 
-    as.matrix %>% as.vector
-  df_data$Name = x[1:nrow(df_data)]
-  
-  return(df_data)
+  df_data %>%
+      mutate(Name = df_map[,1][1:nrow(df_data)])
 }
 
 # linear regression on standard curve
@@ -251,7 +234,6 @@ shinyServer(function(input, output, session) {
   })
   
 
-  
   # calculating concentrations
   data_tbl_conc = reactive({
     if(is.null(data_tbl()) | is.null(std_curve())){
@@ -280,9 +262,7 @@ shinyServer(function(input, output, session) {
     df1 = rbind(df1, df3)
     # adding sample names
     if(!is.null(map_tbl())){
-      df1 = add_sample_names(df1, map_tbl(),
-                             sample_start = input$sample_start,
-                             sample_end = input$sample_end)
+      df1 = add_sample_names(df1, map_tbl())
     }
     return(df1)
   })

@@ -73,3 +73,11 @@ lm2str = function(lm_obj, int_zero=FALSE, rnd=1){
   r2 = round(summary(lm_obj)$r.squared, rnd + 1)
   sprintf('y ~ %sx + %s;  R^2 = %s', a, b, r2)
 }
+
+#' formatting linear regression equation for plotting
+equation = function(x) {
+  a = round(coef(x)[1], digits = 2)
+  b = round(coef(x)[2], digits = 2)
+  r2 = round(summary(x)$r.squared, digits = 2)
+  sprintf("y = %0.2fx +  %.2f, R^2 = %.2f", b, a, r2)
+}
