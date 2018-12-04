@@ -341,12 +341,13 @@ shinyServer(function(input, output, session) {
   
   # Table of calculated concentrations
   output$conc_tbl = DT::renderDataTable(
-    data_tbl_conc() %>%
+    data_tbl_conc()[1:96,] %>%
       dplyr::select(-Mean, -Std_Dev, -CV, -Count),
     filter = 'bottom',
     extensions = c('Buttons'),
     options = list(
-      pageLength = 40,
+      pageLength = 96,
+      lengthMenu = c(48, 96, 384, 1536),
       dom = 'Blfrtip',
       buttons = c('colvis', 'copy', 'csv', 'excel', 'pdf', 'print')
     )
@@ -355,8 +356,7 @@ shinyServer(function(input, output, session) {
   # rendering heatmap of concentrations
   output$conc_tbl_htmap = renderPlotly({
     # WARNING: can only handle 96-well source plate of samples!!!
-    df = data_tbl_conc()
-    df = df[1:96,]
+    df = data_tbl_conc()[1:96,]
     df$RowID = rep(rev(1:8), 12)[1:nrow(df)]
     df$ColID = sapply(1:12, function(x) rep(x, 8)) %>% 
       as.vector() %>% .[1:nrow(df)]
@@ -375,8 +375,7 @@ shinyServer(function(input, output, session) {
   # rendering heatmap of RFU
   output$RFU_tbl_htmap = renderPlotly({
     # WARNING: can only handle 96-well source plate of samples!!!
-    df = data_tbl_conc()
-    df = df[1:96,]
+    df = data_tbl_conc()[1:96,]
     df$RowID = rep(rev(1:8), 12)[1:nrow(df)]
     df$ColID = sapply(1:12, function(x) rep(x, 8)) %>% 
       as.vector() %>% .[1:nrow(df)]
@@ -394,7 +393,7 @@ shinyServer(function(input, output, session) {
   
   # Table formatted for dilution app
   output$conc_tbl_dil = DT::renderDataTable(
-    conc_tbl_to_dilute(data_tbl_conc(), 
+    conc_tbl_to_dilute(data_tbl_conc()[1:96,], 
                        input$TECAN_labware_name,
                        input$TECAN_labware_type,
                        input$TECAN_target_position_start,
@@ -402,8 +401,8 @@ shinyServer(function(input, output, session) {
     filter = 'bottom',
     extensions = c('Buttons'),
     options = list(
-      pageLength = 40,
-      lengthMenu = c(40, 80, 120),
+      pageLength = 96,
+      lengthMenu = c(48, 96, 384, 1536),
       dom = 'Blfrtip',
       buttons = c('colvis', 'copy', 'csv', 'excel', 'pdf', 'print')
     )

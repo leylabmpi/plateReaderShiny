@@ -42,7 +42,7 @@ shinyUI(
         sidebarPanel(
            checkboxInput("set_intercept_zero",
                          label = "Set intercept to zero?", 
-                          value = FALSE),
+                          value = TRUE),
            textInput("masked_wells_plate1",
                      label = "Plate1: Wells in the std curve to mask", 
                      value = ""),
