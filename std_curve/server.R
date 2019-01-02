@@ -273,6 +273,7 @@ shinyServer(function(input, output, session) {
   # Table of raw data
   output$raw_tbl = DT::renderDataTable(
     data_tbl(),
+    rownames= FALSE,
     filter = 'bottom',
     extensions = c('Buttons'),
     options = list(
@@ -286,6 +287,7 @@ shinyServer(function(input, output, session) {
   output$std_curve_tbl = DT::renderDataTable(
     std_curve(),
     filter = 'bottom',
+    rownames= FALSE,
     extensions = c('Buttons'),
     options = list(
       pageLength = 40,
@@ -345,6 +347,7 @@ shinyServer(function(input, output, session) {
     data_tbl_conc()[1:96,] %>%
       dplyr::select(-Mean, -Std_Dev, -CV, -Count),
     filter = 'bottom',
+    rownames= FALSE,
     extensions = c('Buttons'),
     options = list(
       pageLength = 96,
@@ -400,6 +403,7 @@ shinyServer(function(input, output, session) {
                        input$TECAN_target_position_start,
                        input$TECAN_target_position_end),
     filter = 'bottom',
+    rownames= FALSE,
     extensions = c('Buttons'),
     options = list(
       rownames = FALSE,
@@ -413,6 +417,7 @@ shinyServer(function(input, output, session) {
   # Mapping file table
   output$mapping_tbl = DT::renderDataTable(
     map_tbl(),
+    rownames= FALSE,
     filter = 'bottom',
     extensions = c('Buttons'),
     options = list(
