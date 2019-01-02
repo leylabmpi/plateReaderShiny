@@ -91,8 +91,10 @@ shinyUI(
     ),
     tabPanel("Examples", 
       tabsetPanel("Examples",
-                  tabPanel("Example data table", DT::dataTableOutput('example_data_tbl')),
-                  tabPanel("Example sample IDs", DT::dataTableOutput('example_map_tbl'))
+                  tabPanel("Example data table", 
+                           DT::dataTableOutput('example_data_tbl')),
+                  tabPanel("Example sample IDs",
+                           DT::dataTableOutput('example_map_tbl'))
       )
     )
   )

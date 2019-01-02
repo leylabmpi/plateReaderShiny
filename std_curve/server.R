@@ -140,7 +140,9 @@ conc_tbl_to_dilute = function(df,
 
 #' loading example plate reader file
 load_ex_data_file = function(){
-  read_excel('../data/picogreen1.xlsx')
+  x = read_excel('../data/picogreen1.xlsx')
+  colnames(x) = gsub('480520', '480,520', colnames(x))
+  return(x)
 }
 
 #' loading example mapping file
@@ -424,6 +426,7 @@ shinyServer(function(input, output, session) {
   # example data table
   output$example_data_tbl = DT::renderDataTable(
     load_ex_data_file(),
+    rownames= FALSE,
     extensions = c('Buttons'),
     options = list(
       pageLength = 96,
@@ -436,6 +439,7 @@ shinyServer(function(input, output, session) {
   # example mapping table
   output$example_map_tbl = DT::renderDataTable(
     load_ex_map_file(),
+    rownames= FALSE,
     extensions = c('Buttons'),
     options = list(
       pageLength = 96,
