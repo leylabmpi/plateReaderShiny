@@ -134,7 +134,6 @@ conc_tbl_to_dilute = function(df,
            TECAN_target_position = TECAN_target_position,
            TECAN_sample_conc = Conc_Dil) %>%
     dplyr::select(-Conc_Dil, -Well)
-  colnames(df) = gsub('_', ' ', colnames(df))
   return(df)
 }
 
@@ -403,10 +402,11 @@ shinyServer(function(input, output, session) {
     filter = 'bottom',
     extensions = c('Buttons'),
     options = list(
+      rownames = FALSE,
       pageLength = 96,
       lengthMenu = c(48, 96, 384, 1536),
       dom = 'Blfrtip',
-      buttons = c('colvis', 'copy', 'csv', 'excel', 'pdf', 'print')
+      buttons = c('copy', 'csv', 'excel', 'pdf', 'print')
     )
   )
   
