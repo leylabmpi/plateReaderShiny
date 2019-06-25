@@ -160,7 +160,7 @@ add_sample_names = function(df_data, df_map){
       mutate(Name = df_map[,1][1:nrow(df_data)])
 }
 
-# linear regression on standard curve
+#' linear regression on standard curve
 std_curve_lm = function(df_std_curve){
   if(is.null(df_std_curve) | nrow(df_std_curve) == 0){
     return(NULL)
@@ -170,6 +170,16 @@ std_curve_lm = function(df_std_curve){
     summarize(mean_RFU = mean(RFU, na.rm=TRUE)) %>%
     ungroup()
   lm(mean_RFU ~ Conc_Dil, data = df)
+}
+
+#' conc_tbl formatting
+conc_tbl_format = function(df){
+  if(is.null(df) || nrow(df) < 1){
+    return(NULL)
+  }
+  df = df %>%
+    dplyr::select(-Mean, -Std_Dev, -CV, -Count)
+  return(df)
 }
 
 
@@ -344,8 +354,7 @@ shinyServer(function(input, output, session) {
   
   # Table of calculated concentrations
   output$conc_tbl = DT::renderDataTable(
-    data_tbl_conc()[1:96,] %>%
-      dplyr::select(-Mean, -Std_Dev, -CV, -Count),
+    conc_tbl_format(data_tbl_conc()[1:96,]),
     filter = 'bottom',
     rownames= FALSE,
     extensions = c('Buttons'),
@@ -360,7 +369,11 @@ shinyServer(function(input, output, session) {
   # rendering heatmap of concentrations
   output$conc_tbl_htmap = renderPlotly({
     # WARNING: can only handle 96-well source plate of samples!!!
-    df = data_tbl_conc()[1:96,]
+    df = data_tbl_conc()
+    if(is.null(df) || nrow(df) < 1){
+      return(NULL)
+    }
+    df = df[1:96,]
     df$RowID = rep(rev(1:8), 12)[1:nrow(df)]
     df$ColID = sapply(1:12, function(x) rep(x, 8)) %>% 
       as.vector() %>% .[1:nrow(df)]
@@ -379,7 +392,11 @@ shinyServer(function(input, output, session) {
   # rendering heatmap of RFU
   output$RFU_tbl_htmap = renderPlotly({
     # WARNING: can only handle 96-well source plate of samples!!!
-    df = data_tbl_conc()[1:96,]
+    df = data_tbl_conc()
+    if(is.null(df) || nrow(df) < 1){
+      return(NULL)
+    }
+    df = df[1:96,]
     df$RowID = rep(rev(1:8), 12)[1:nrow(df)]
     df$ColID = sapply(1:12, function(x) rep(x, 8)) %>% 
       as.vector() %>% .[1:nrow(df)]

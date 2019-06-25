@@ -55,6 +55,11 @@ shinyUI(
            width=3
         ),
         mainPanel(
+          fluidRow(
+            column(12,
+                   h5('WARNING: this app assumes a dilution of 1:100 (sample : total_rxn_volume)')
+            )
+          ),
           tabsetPanel(
             tabPanel("Std curve plot", plotlyOutput('std_curve_plot', height='700px')),
             tabPanel("Std curve table", DT::dataTableOutput('std_curve_tbl'))
@@ -89,9 +94,8 @@ shinyUI(
         )
       )
     ),
-    tabPanel("Examples", 
-      tabsetPanel("Examples",
-                  tabPanel("Example data table", 
+    tabPanel("Examples",
+      tabsetPanel(tabPanel("Example data table",
                            DT::dataTableOutput('example_data_tbl')),
                   tabPanel("Example sample IDs",
                            DT::dataTableOutput('example_map_tbl'))
