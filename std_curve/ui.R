@@ -40,9 +40,8 @@ shinyUI(
     tabPanel("Std curve", 
       sidebarLayout(
         sidebarPanel(
-           checkboxInput("set_intercept_zero",
-                         label = "Set intercept to zero?", 
-                          value = FALSE),
+           h5('WARNING: do not use masking in the plate reader software! Mask wells using the options below.'),
+           h6('For multiple wells, use comma-delimited lists (eg., "A1,B1")'),
            textInput("masked_wells_plate1",
                      label = "Plate1: Wells in the std curve to mask", 
                      value = ""),
@@ -52,6 +51,9 @@ shinyUI(
            textInput("masked_wells_plate3",
                      label = "Plate3: Wells in the std curve to mask", 
                      value = ""),
+           checkboxInput("set_intercept_zero",
+                         label = "Set intercept to zero?", 
+                         value = FALSE),
            width=3
         ),
         mainPanel(
