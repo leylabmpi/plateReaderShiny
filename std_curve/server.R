@@ -182,6 +182,28 @@ conc_tbl_format = function(df){
   return(df)
 }
 
+#' subtracting out blank samples
+subtract_blanks = function(df, blank_samples){
+  # formatting 
+  blank_samples = gsub(' +', '', blank_samples) %>%
+    strsplit(',') %>% unlist
+  print(blank_samples)
+  print(head(df))
+  # getting mean blank conc
+  mean_blank_conc = df %>%
+    filter(Well_ID %in% blank_samples) %>%
+    .$Conc_Dil %>% mean(na.rm=TRUE)  
+  if(is.na(mean_blank_conc)){
+    return(df)
+  }
+  # subtracting
+  df = df %>%
+      mutate(Conc_Dil = Conc_Dil - mean_blank_conc,
+             Conc_Dil = ifelse(Conc_Dil < 0, 0, Conc_Dil),
+             Conc_Dil = round(Conc_Dil, 3))
+  return(df)
+}
+
 
 #------------------ SERVER ----------------#
 shinyServer(function(input, output, session) {
@@ -275,6 +297,11 @@ shinyServer(function(input, output, session) {
     if(!is.null(map_tbl())){
       df1 = add_sample_names(df1, map_tbl())
     }
+    # substracting blanks from concentrations
+    if(!is.null(input$blank_samples) & input$blank_samples != ''){
+      df1 = subtract_blanks(df1, input$blank_samples)
+    }
+    # ret
     return(df1)
   })
    

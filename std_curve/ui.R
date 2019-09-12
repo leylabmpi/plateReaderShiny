@@ -84,6 +84,13 @@ shinyUI(
           numericInput("TECAN_target_position_end", 
                           label = "Target position end",
                           value = '96', min=1),
+          hr(),
+          h4('Blank sample substraction'),
+          h6('Subtracting out "blank" sample concentations. 
+              The mean of all blank samples will be used.'),
+          textInput("blank_samples",
+                    label = "Blank samples: list Well IDs (comma-separated)", 
+                    value = ""),
           width=3
         ),
         mainPanel(      
