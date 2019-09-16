@@ -69,6 +69,11 @@ read_conc = function(txt, label, header=TRUE){
            Name = ifelse(lag(Name) != "", 
                          lag(Name), Name), #fill_names(Name),
            Plate_ID = label)
+  
+  # well IDs
+  x = df %>% filter(Well_ID != '') %>% .$Well_ID %>% as.character 
+  df$Well_ID_group = c(rbind(x, x)) 
+  # ret
   return(df)
 }
 
@@ -81,6 +86,18 @@ read_map = function(map_file, sheet_name){
   infile = rename_tmp_file(map_file)
   df = read_table_file(infile, sheet_name)
   return(df)
+}
+
+#' linear regression on standard curve
+std_curve_lm = function(df_std_curve){
+  if(is.null(df_std_curve) | nrow(df_std_curve) == 0){
+    return(NULL)
+  }
+  df = df_std_curve %>%
+    group_by(Conc_Dil) %>%
+    summarize(mean_RFU = mean(RFU, na.rm=TRUE)) %>%
+    ungroup()
+  lm(mean_RFU ~ Conc_Dil, data = df)
 }
 
 #' calculating concentations based on linear regression of std curve
@@ -160,18 +177,6 @@ add_sample_names = function(df_data, df_map){
       mutate(Name = df_map[,1][1:nrow(df_data)])
 }
 
-#' linear regression on standard curve
-std_curve_lm = function(df_std_curve){
-  if(is.null(df_std_curve) | nrow(df_std_curve) == 0){
-    return(NULL)
-  }
-  df = df_std_curve %>%
-    group_by(Conc_Dil) %>%
-    summarize(mean_RFU = mean(RFU, na.rm=TRUE)) %>%
-    ungroup()
-  lm(mean_RFU ~ Conc_Dil, data = df)
-}
-
 #' conc_tbl formatting
 conc_tbl_format = function(df){
   if(is.null(df) || nrow(df) < 1){
@@ -182,25 +187,62 @@ conc_tbl_format = function(df){
   return(df)
 }
 
+#' Assuming that, for any samples where the replicates differ a lot in conc., 
+#' the lowest conc. replicate is incorrect and removed
+#' To get highest value of the replicates, using simple formula: `mean(x) + (sd(x) / 1.42)`
+remove_low_conc_reps = function(df, CV_cutoff){
+  if(!is.na(CV_cutoff) & CV_cutoff > 0){
+    df_std = df %>%
+        filter(Name == 'Standard curve')
+    df_unk = df %>%
+        filter(is.na(Name) | Name != 'Standard curve') %>%
+        group_by(Well_ID_group) %>%
+        mutate(MAX_CV = max(CV, na.rm=TRUE),
+               RFU = ifelse(MAX_CV >= CV_cutoff,
+                            max(RFU), RFU)) %>%
+        ungroup() %>%
+        mutate(Mean = ifelse(!is.na(Mean) & !is.na(Std_Dev) & MAX_CV >= CV_cutoff, 
+                             Mean + (Std_Dev / 1.42), Mean))
+       
+    df = rbind(df_unk, df_unk) %>% as.data.frame
+  }
+  return(df)
+}
+
 #' subtracting out blank samples
 subtract_blanks = function(df, blank_samples){
   # formatting 
   blank_samples = gsub(' +', '', blank_samples) %>%
     strsplit(',') %>% unlist
-  print(blank_samples)
-  print(head(df))
+  # getting mean RFU
+  mean_blank_RFU = df %>%
+    filter(Well_ID %in% blank_samples) %>%
+    .$RFU %>% mean(na.rm=TRUE) 
+  # getting mean blank mean RFU
+  mean_blank_Mean = df %>%
+    filter(Well_ID %in% blank_samples) %>%
+    .$Mean %>% mean(na.rm=TRUE)  
   # getting mean blank conc
   mean_blank_conc = df %>%
     filter(Well_ID %in% blank_samples) %>%
     .$Conc_Dil %>% mean(na.rm=TRUE)  
-  if(is.na(mean_blank_conc)){
+
+  # check
+  if(is.na(mean_blank_RFU) | is.na(mean_blank_Mean) | is.na(mean_blank_conc)){
     return(df)
-  }
+  } 
   # subtracting
   df = df %>%
-      mutate(Conc_Dil = Conc_Dil - mean_blank_conc,
+      mutate(RFU = RFU - mean_blank_RFU,
+             RFU = ifelse(RFU < 0, 0, RFU),
+             RFU = round(RFU, 3),
+             Mean = Mean - mean_blank_Mean,
+             Mean = ifelse(Mean < 0, 0, Mean),
+             Mean = round(Mean, 3),
+             Conc_Dil = Conc_Dil - mean_blank_conc,
              Conc_Dil = ifelse(Conc_Dil < 0, 0, Conc_Dil),
              Conc_Dil = round(Conc_Dil, 3))
+  # ret       
   return(df)
 }
 
@@ -224,6 +266,7 @@ shinyServer(function(input, output, session) {
       cols = c('Plate_ID', setdiff(cols, 'Plate_ID'))
       df1 = df1[,cols]
     }
+      
     return(df1)
   })
   
@@ -263,7 +306,8 @@ shinyServer(function(input, output, session) {
         filter(Name == 'Standard curve') %>%
         filter(!(Plate_ID == 'Plate1' & Well %in% masked_wells_plate1()),
                !(Plate_ID == 'Plate2' & Well %in% masked_wells_plate2()),
-               !(Plate_ID == 'Plate3' & Well %in% masked_wells_plate3()))
+               !(Plate_ID == 'Plate3' & Well %in% masked_wells_plate3())) %>%
+        dplyr::select(-Well_ID_group)
   })
   
 
@@ -274,21 +318,24 @@ shinyServer(function(input, output, session) {
     }
     df1 = data_tbl() %>% 
       filter(Plate_ID == 'Plate1') %>%
+      remove_low_conc_reps(input$CV_cutoff) %>%
       calc_conc(std_curve() %>% 
-                  filter(Plate_ID == 'Plate1') %>%
-                  std_curve_lm, input$set_intercept_zero) %>%
+                filter(Plate_ID == 'Plate1') %>%
+                std_curve_lm, input$set_intercept_zero) %>%
       mutate(Conc_Dil = round(Conc_Dil %>% as.Num, 3))
     df2 = data_tbl() %>% 
       filter(Plate_ID == 'Plate2') %>%
+      remove_low_conc_reps(input$CV_cutoff) %>%
       calc_conc(std_curve() %>% 
-                  filter(Plate_ID == 'Plate2') %>%
-                  std_curve_lm, input$set_intercept_zero) %>%
+                filter(Plate_ID == 'Plate2') %>%
+                std_curve_lm, input$set_intercept_zero) %>%
       mutate(Conc_Dil = round(Conc_Dil %>% as.Num, 3))
     df3 = data_tbl() %>% 
       filter(Plate_ID == 'Plate3') %>%
+      remove_low_conc_reps(input$CV_cutoff) %>%
       calc_conc(std_curve() %>% 
-                  filter(Plate_ID == 'Plate3') %>%
-                  std_curve_lm, input$set_intercept_zero) %>%
+                filter(Plate_ID == 'Plate3') %>%
+                std_curve_lm, input$set_intercept_zero) %>%
       mutate(Conc_Dil = round(Conc_Dil %>% as.Num, 3))
     # combining tables
     df1 = rbind(df1, df2)
@@ -301,6 +348,7 @@ shinyServer(function(input, output, session) {
     if(!is.null(input$blank_samples) & input$blank_samples != ''){
       df1 = subtract_blanks(df1, input$blank_samples)
     }
+    df1 = dplyr::select(df1, -Well_ID_group)
     # ret
     return(df1)
   })
@@ -371,7 +419,7 @@ shinyServer(function(input, output, session) {
     # plotting
     p = ggplot(df_std_curve, aes(Def_conc, RFU)) +
       geom_smooth(method=lm) +
-      geom_point(aes(test=Well)) +
+      geom_point() +
       geom_text(data=df_fit, aes(x=x, y=y, label=Fit)) +
       labs(x='Defined conc.', y='RFU') +
       facet_wrap(~ Plate_ID, ncol=2) +
