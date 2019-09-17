@@ -95,7 +95,7 @@ shinyUI(
           h5('If large differences between replicates (eg., due to low DNA volumes), you can filter out low conc. replicates with this cutoff'),
           numericInput("CV_cutoff",
                         label = "CV cutoff", 
-                        value = 25),
+                        value = 50),
           width=3
         ),
         mainPanel(      
