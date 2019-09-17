@@ -189,7 +189,6 @@ conc_tbl_format = function(df){
 
 #' Assuming that, for any samples where the replicates differ a lot in conc., 
 #' the lowest conc. replicate is incorrect and removed
-#' To get highest value of the replicates, using simple formula: `mean(x) + (sd(x) / 1.42)`
 remove_low_conc_reps = function(df, CV_cutoff){
   if(!is.na(CV_cutoff) & CV_cutoff > 0){
     df_std = df %>%
@@ -202,7 +201,8 @@ remove_low_conc_reps = function(df, CV_cutoff){
                             max(RFU), RFU)) %>%
         ungroup() %>%
         mutate(Mean = ifelse(!is.na(Mean) & !is.na(Std_Dev) & MAX_CV >= CV_cutoff, 
-                             Mean + (Std_Dev / 1.42), Mean))
+                             RFU, Mean)) %>%
+        dplyr::select(-MAX_CV)
        
     df = rbind(df_unk, df_unk) %>% as.data.frame
   }
